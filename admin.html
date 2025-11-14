@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Bảng Admin</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --bg-color: #1a1a1a; --container-bg: #2b2b2b; --text-color: #f0f0f0;
+            --primary-color: #00aaff; --border-color: #444; --error-color: #e74c3c;
+            --success-color: #2ecc71; --warn-color: #f39c12;
+            --tai-color: #ff00aa; --xiu-color: #00f0ff;
+        }
+        body { font-family: Arial, sans-serif; background: var(--bg-color); color: var(--text-color); padding: 15px; text-align: center; }
+        .container { max-width: 700px; margin: auto; background: var(--container-bg); border-radius: 12px; padding: 20px; text-align: left; }
+        h1 { color: var(--primary-color); border-bottom: 2px solid var(--border-color); padding-bottom: 10px; margin-bottom: 20px; text-align: center; }
+        .admin-section { background: #3c3c3c; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .admin-section h2 { margin-top: 0; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
+        .form-group { margin-bottom: 10px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group input, .form-group textarea {
+            width: 100%; padding: 10px; background: var(--bg-color);
+            border: 1px solid var(--border-color); color: var(--text-color);
+            border-radius: 5px; box-sizing: border-box; font-family: Arial, sans-serif;
+        }
+        .button-group { display: flex; gap: 10px; }
+        .admin-btn { flex: 1; padding: 12px; border: none; border-radius: 5px; font-size: 16px; font-weight: bold; color: white; cursor: pointer; transition: background-color 0.2s; }
+        .admin-btn:hover { opacity: 0.8; }
+        #btn-add { background-color: var(--success-color); }
+        #btn-sub { background-color: var(--error-color); }
+        #btn-confirm-deposit { background-color: var(--primary-color); }
+        #btn-toggle-ban { background-color: var(--warn-color); }
+        #btn-broadcast { background-color: var(--primary-color); }
+        #btn-create-code { background-color: var(--success-color); }
+        /* Nút chỉnh cầu */
+        #btn-get-session { background-color: #555; }
+        #btn-set-result { background-color: var(--warn-color); } /* Nút SET KẾT QUẢ */
+
+        #modify-status, #deposit-status, #withdrawal-status, #ban-status, #broadcast-status, #code-status, #history-status, #set-result-status { 
+            margin-top: 10px; font-weight: bold; min-height: 20px;
+        }
+        .list-container { max-height: 300px; overflow-y: auto; background: var(--bg-color); padding: 10px; border-radius: 5px; font-size: 0.9em; }
+        .list-container li { list-style: none; padding: 8px 5px; border-bottom: 1px solid var(--border-color); }
+        .list-container li:last-child { border-bottom: none; }
+        #user-list li { cursor: pointer; transition: background-color 0.2s; }
+        #user-list li:hover { background-color: #3c3c3c; }
+        .withdrawal-item .info { font-size: 1.1em; }
+        .withdrawal-item .bank { font-size: 0.9em; color: #ccc; margin: 5px 0; }
+        .withdrawal-item .actions { display: flex; gap: 10px; margin-top: 10px; }
+        .wd-btn { padding: 8px 12px; border: none; border-radius: 5px; color: white; font-weight: bold; cursor: pointer; }
+        .btn-approve { background-color: var(--success-color); }
+        .btn-deny { background-color: var(--error-color); }
+        .error { color: var(--error-color); } .success { color: var(--success-color); }
+        .banned-user { color: var(--error-color); text-decoration: line-through; }
+        .tab-buttons { display: flex; background-color: #3c3c3c; border-radius: 8px; margin-bottom: 20px; overflow: hidden; }
+        .tab-btn { flex: 1; background-color: transparent; color: var(--text-color); border: none; padding: 12px 10px; font-size: 14px; font-weight: bold; cursor: pointer; transition: background-color 0.3s; }
+        .tab-btn:hover { background-color: #555; }
+        .tab-btn.active { background-color: var(--primary-color); color: white; }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Bảng Admin</h1>
+
+        <div class="tab-buttons">
+            <button class="tab-btn" onclick="openTab(event, 'tab-tools')" id="btn-tab-tools">🛠️ Công cụ</button>
+            <button class="tab-btn" onclick="openTab(event, 'tab-users')">👤 Quản lý User</button>
+            <button class="tab-btn" onclick="openTab(event, 'tab-withdraw')">💸 Duyệt Rút</button>
+            <button class="tab-btn" onclick="openTab(event, 'tab-history')">📊 Lịch sử</button>
+        </div>
+
+        <div id="tab-tools" class="tab-panel">
+            <div class="admin-section">
+                <h2>Chỉnh Kết Quả Phiên TX 30s</h2>
+                <div class="form-group">
+                    <label for="session-id-input">Mã Phiên (Bấm "LẤY PHIÊN")</label>
+                    <input type="text" id="session-id-input" placeholder="Chờ lấy mã phiên..." readonly>
+                </div>
+                <button class="admin-btn" id="btn-get-session" style="margin-bottom: 10px;">LẤY PHIÊN HIỆN TẠI</button>
+
+                <div class="form-group">
+                    <label for="dice-result-input">Nhập 3 số kết quả</label>
+                    <input type="number" id="dice-result-input" placeholder="Ví dụ: 123 (Xỉu) hoặc 662 (Tài)">
+                </div>
+                <button class="admin-btn" id="btn-set-result">SET KẾT QUẢ (VD: 241)</button>
+                <div id="set-result-status"></div>
+            </div>
+
+            <div class="admin-section">
+                <h2>Gửi Thông Báo (Broadcast)</h2>
+                <div class="form-group"><label for="broadcast-message">Nội dung (Hỗ trợ HTML)</label><textarea id="broadcast-message" rows="3" placeholder="Ví dụ: <b>Bảo trì 5 phút!</b>"></textarea></div>
+                <button class="admin-btn" id="btn-broadcast">GỬI THÔNG BÁO</button>
+                <div id="broadcast-status"></div>
+            </div>
+            <div class="admin-section">
+                <h2>Tạo Giftcode</h2>
+                <div class="button-group">
+                    <div class="form-group" style="flex: 2;"><label for="code-name">Mã Code (IN HOA)</label><input type="text" id="code-name" placeholder="TESTCODE"></div>
+                    <div class="form-group" style="flex: 1;"><label for="code-amount">Số tiền</label><input type="number" id="code-amount" placeholder="10000"></div>
+                    <div class="form-group" style="flex: 1;"><label for="code-limit">Số lượt dùng</label><input type="number" id="code-limit" placeholder="100" value="1"></div>
+                </div>
+                <button class="admin-btn" id="btn-create-code">TẠO CODE</button>
+                <div id="code-status"></div>
+            </div>
+            <div class="admin-section">
+                <h2>Xác nhận Nạp tiền</h2>
+                <div class="form-group"><label for="deposit-user-id">ID Người dùng (Nội dung CK)</label><input type="text" id="deposit-user-id" placeholder="Nhập ID user đã nạp tiền"></div>
+                <div class="form-group"><label for="deposit-amount">Số tiền nạp</label><input type="number" id="deposit-amount" placeholder="Nhập số tiền user đã chuyển"></div>
+                <button class="admin-btn" id="btn-confirm-deposit">XÁC NHẬN NẠP</button>
+                <div id="deposit-status"></div>
+            </div>
+        </div>
+
+        <div id="tab-users" class="tab-panel">
+            <div class="admin-section">
+                <h2>Quản lý Số dư (Cộng/Trừ)</h2>
+                <div class="form-group"><label for="target-user-id">ID Người dùng</label><input type="text" id="target-user-id" placeholder="Click vào user bên dưới để chọn"></div>
+                <div class="form-group"><label for="modify-amount">Số tiền</label><input type="number" id="modify-amount" placeholder="Ví dụ: 50000 (cộng) hoặc -20000 (trừ)"></div>
+                <div class="button-group">
+                    <button class="admin-btn" id="btn-add">CỘNG TIỀN</button>
+                    <button class="admin-btn" id="btn-sub">TRỪ TIỀN</button>
+                </div>
+                <div id="modify-status"></div>
+            </div>
+            <div class="admin-section">
+                <h2>Quản lý User (Ban/Unban)</h2>
+                <div class="form-group"><label for="ban-user-id">ID Người dùng</label><input type="text" id="ban-user-id" placeholder="Click vào user bên dưới để chọn"></div>
+                <button class="admin-btn" id="btn-toggle-ban">BAN / UNBAN USER</button>
+                <div id="ban-status"></div>
+            </div>
+            <div class="admin-section" id="user-list-container">
+                <h2>Danh sách User (<span id="user-count">0</span>)</h2>
+                <div class="list-container" id="user-list">Đang tải...</div>
+            </div>
+        </div>
+
+        <div id="tab-withdraw" class="tab-panel">
+            <div class="admin-section" id="withdrawal-list-container">
+                <h2>Yêu cầu Rút tiền đang chờ (<span id="withdrawal-count">0</span>)</h2>
+                <div class="list-container" id="withdrawal-list">Đang tải...</div>
+                <div id="withdrawal-status"></div>
+            </div>
+        </div>
+
+        <div id="tab-history" class="tab-panel">
+            <div class="admin-section" id="history-list-container">
+                <h2>Lịch sử Cược Toàn Cầu (50)</h2>
+                <button class="admin-btn" id="btn-load-history" style="background-color: #555;">TẢI LỊCH SỬ CƯỢC</button>
+                <div class="list-container" id="history-list" style="margin-top: 10px;">...</div>
+                <div id="history-status"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // === URL API (ĐÃ SỬA) ===
+        const API_URL = "https://b8925e2e-6861-4573-ae45-26e3c60987b8-00-3ghb3td81ffx1.sisko.replit.dev";
+        // =======================
+
+        const tg = window.Telegram.WebApp;
+        let ADMIN_ID = null; 
+
+        // (Lấy các element DOM)
+        const userListEl = document.getElementById('user-list');
+        const userCountEl = document.getElementById('user-count');
+        const targetUserIdEl = document.getElementById('target-user-id');
+        const modifyAmountEl = document.getElementById('modify-amount');
+        const modifyStatusEl = document.getElementById('modify-status');
+        const withdrawalListEl = document.getElementById('withdrawal-list');
+        const withdrawalCountEl = document.getElementById('withdrawal-count');
+        const withdrawalStatusEl = document.getElementById('withdrawal-status');
+        const depositUserIdEl = document.getElementById('deposit-user-id');
+        const depositAmountEl = document.getElementById('deposit-amount');
+        const depositStatusEl = document.getElementById('deposit-status');
+        const banUserIdEl = document.getElementById('ban-user-id');
+        const banStatusEl = document.getElementById('ban-status');
+        const broadcastMsgEl = document.getElementById('broadcast-message');
+        const broadcastStatusEl = document.getElementById('broadcast-status');
+        const codeNameEl = document.getElementById('code-name');
+        const codeAmountEl = document.getElementById('code-amount');
+        const codeLimitEl = document.getElementById('code-limit'); 
+        const codeStatusEl = document.getElementById('code-status');
+        const historyListEl = document.getElementById('history-list');
+        const historyStatusEl = document.getElementById('history-status');
+
+        // === ELEMENT MỚI ĐỂ CHỈNH CẦU ===
+        const sessionIdInput = document.getElementById('session-id-input');
+        const diceResultInput = document.getElementById('dice-result-input'); // Ô nhập 3 số
+        const setResultStatusEl = document.getElementById('set-result-status');
+        // ==============================
+
+        function openTab(evt, tabName) {
+            let tabPanels = document.getElementsByClassName("tab-panel");
+            for (let i = 0; i < tabPanels.length; i++) tabPanels[i].style.display = "none";
+            let tabButtons = document.getElementsByClassName("tab-btn");
+            for (let i = 0; i < tabButtons.length; i++) tabButtons[i].className = tabButtons[i].className.replace(" active", "");
+            document.getElementById(tabName).style.display = "block";
+            evt.currentTarget.className += " active";
+        }
+
+        window.onload = function() {
+            tg.ready(); tg.expand(); 
+            if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                ADMIN_ID = tg.initDataUnsafe.user.id;
+                loadAllUsers(); 
+                loadWithdrawals();
+
+                // Gán sự kiện
+                document.getElementById('btn-add').onclick = () => modifyBalance(true);
+                document.getElementById('btn-sub').onclick = () => modifyBalance(false);
+                document.getElementById('btn-confirm-deposit').onclick = confirmDeposit;
+                document.getElementById('btn-toggle-ban').onclick = toggleBan;
+                document.getElementById('btn-broadcast').onclick = broadcastMessage;
+                document.getElementById('btn-create-code').onclick = createGiftcode;
+                document.getElementById('btn-load-history').onclick = loadAllBetHistory;
+
+                // === GÁN SỰ KIỆN MỚI ===
+                document.getElementById('btn-get-session').onclick = getSessionId;
+                document.getElementById('btn-set-result').onclick = setResult; // Sửa
+                // ======================
+
+                document.getElementById('btn-tab-tools').click(); // Mở tab đầu tiên
+            } else {
+                document.body.innerHTML = `<h1 style="color: red;">LỖI XÁC THỰC</h1>`;
+            }
+        };
+
+        // --- Hàm API Helper ---
+        async function callApi(endpoint, method = 'GET', body = null) {
+            const url = `${API_URL}${endpoint}`;
+            const options = {
+                method: method,
+                headers: {'Content-Type': 'application/json'}
+            };
+            if (body) {
+                options.body = JSON.stringify(body);
+            }
+            try {
+                const response = await fetch(url, options);
+                const data = await response.json();
+                return { ok: response.ok, data: data };
+            } catch (error) {
+                console.error(`API Error (${endpoint}):`, error);
+                return { ok: false, data: { error: "Lỗi kết nối API." } };
+            }
+        }
+
+        // (Tất cả các hàm JavaScript khác giữ nguyên y hệt)
+        async function loadAllUsers() {
+            const { ok, data } = await callApi(`/admin/all_users?admin_id=${ADMIN_ID}`);
+            if (ok) {
+                let userListHtml = '<ul>'; let userCount = 0;
+                for (const id in data) {
+                    const user = data[id];
+                    const banClass = user.is_banned ? 'banned-user' : '';
+                    userListHtml += `<li onclick="selectUser('${id}', '${user.username}')" class="${banClass}">
+                        <strong>${user.username}</strong> (ID: ${id}) ${user.is_banned ? '<b>[BANNED]</b>' : ''}<br>
+                        Số dư: ${user.balance.toLocaleString('vi-VN')} đ
+                    </li>`;
+                    userCount++;
+                }
+                userListHtml += '</ul>'; userCountEl.innerText = userCount; userListEl.innerHTML = userListHtml;
+            } else { userListEl.innerHTML = `<div class="error">Lỗi: ${data.error}</div>`; }
+        }
+        function selectUser(id, username) {
+            targetUserIdEl.value = id; 
+            depositUserIdEl.value = id;
+            banUserIdEl.value = id; 
+            modifyAmountEl.placeholder = `Sửa tiền cho ${username}`;
+            document.querySelector("button[onclick*='tab-users']").click();
+            window.scrollTo(0, 0);
+        }
+        async function modifyBalance(isAdding) {
+            const targetId = targetUserIdEl.value; let amountStr = modifyAmountEl.value;
+            if (!targetId || !amountStr) { modifyStatusEl.className = 'error'; modifyStatusEl.innerText = "Vui lòng nhập ID User và Số tiền."; return; }
+            let amount = parseInt(amountStr);
+            if (isNaN(amount) || amount === 0) { modifyStatusEl.className = 'error'; modifyStatusEl.innerText = "Số tiền không hợp lệ."; return; }
+            if (!isAdding) { amount = -Math.abs(amount); } else { amount = Math.abs(amount); }
+            modifyStatusEl.className = 'info'; modifyStatusEl.innerText = "Đang xử lý...";
+            const { ok, data } = await callApi('/admin/modify_balance', 'POST', { admin_id: ADMIN_ID, target_user_id: targetId, amount: amount });
+            if (ok) {
+                modifyStatusEl.className = 'success'; modifyStatusEl.innerText = data.message;
+                loadAllUsers(); modifyAmountEl.value = "";
+            } else { modifyStatusEl.className = 'error'; modifyStatusEl.innerText = `Lỗi: ${data.error}`; }
+        }
+        async function loadWithdrawals() {
+            withdrawalStatusEl.innerText = "";
+            const { ok, data } = await callApi(`/admin/pending_withdrawals?admin_id=${ADMIN_ID}`);
+            if (ok) {
+                let listHtml = '<ul>'; let count = 0;
+                if (data.length === 0) { listHtml = "Không có yêu cầu nào đang chờ."; }
+                else {
+                    for (const req of data) {
+                        listHtml += `<li class="withdrawal-item" id="wd-${req.id}">
+                            <div class="info"><strong>${req.username}</strong> (ID: ${req.user_id})<br>Rút: <strong style="color: var(--warn-color);">${req.amount.toLocaleString('vi-VN')} đ</strong></div>
+                            <div class="bank">BANK: ${req.bank_info}</div>
+                            <div class="actions">
+                                <button class="wd-btn btn-approve" onclick="processWithdrawal('${req.id}', 'approve')">DUYỆT</button>
+                                <button class="wd-btn btn-deny" onclick="processWithdrawal('${req.id}', 'deny')">TỪ CHỐI</button>
+                            </div></li>`;
+                        count++;
+                    } listHtml += '</ul>';
+                }
+                withdrawalCountEl.innerText = count; withdrawalListEl.innerHTML = listHtml;
+            } else { withdrawalListEl.innerHTML = `<div class="error">Lỗi: ${data.error}</div>`; }
+        }
+        async function processWithdrawal(withdrawal_id, action) {
+            let note = ""; let requestBody = { admin_id: ADMIN_ID, withdrawal_id: withdrawal_id, action: action };
+            if (action === 'approve') { if (!confirm(`Bạn có chắc muốn DUYỆT yêu cầu ${withdrawal_id} không?`)) return; } 
+            else if (action === 'deny') {
+                note = prompt(`Vui lòng nhập LÝ DO TỪ CHỐI cho yêu cầu ${withdrawal_id}:`);
+                if (!note) { alert("Bạn phải nhập lý do để từ chối."); return; }
+                requestBody.note = note;
+            }
+            withdrawalStatusEl.className = 'info'; withdrawalStatusEl.innerText = "Đang xử lý...";
+            const { ok, data } = await callApi('/admin/process_withdrawal', 'POST', requestBody);
+            if (ok) {
+                withdrawalStatusEl.className = 'success'; withdrawalStatusEl.innerText = data.message;
+                loadWithdrawals(); loadAllUsers(); 
+            } else { withdrawalStatusEl.className = 'error'; withdrawalStatusEl.innerText = `Lỗi: ${data.error}`; }
+        }
+        async function confirmDeposit() {
+            const targetId = depositUserIdEl.value; const amountStr = depositAmountEl.value;
+            if (!targetId || !amountStr) { depositStatusEl.className = 'error'; depositStatusEl.innerText = "Vui lòng nhập ID User và Số tiền nạp."; return; }
+            let amount = parseInt(amountStr);
+            if (isNaN(amount) || amount <= 0) { depositStatusEl.className = 'error'; depositStatusEl.innerText = "Số tiền nạp không hợp lệ."; return; }
+            depositStatusEl.className = 'info'; depositStatusEl.innerText = "Đang xử lý...";
+            const { ok, data } = await callApi('/admin/confirm_deposit', 'POST', { admin_id: ADMIN_ID, target_user_id: targetId, amount: amount });
+            if (ok) {
+                depositStatusEl.className = 'success'; depositStatusEl.innerText = data.message;
+                loadAllUsers(); depositUserIdEl.value = ""; depositAmountEl.value = "";
+            } else { depositStatusEl.className = 'error'; depositStatusEl.innerText = `Lỗi: ${data.error}`; }
+        }
+        async function toggleBan() {
+            const targetId = banUserIdEl.value;
+            if (!targetId) { banStatusEl.className = 'error'; banStatusEl.innerText = "Vui lòng chọn user."; return; }
+            banStatusEl.className = 'info'; banStatusEl.innerText = "Đang xử lý...";
+            const { ok, data } = await callApi('/admin/toggle_ban', 'POST', { admin_id: ADMIN_ID, target_user_id: targetId });
+            if (ok) {
+                banStatusEl.className = 'success'; banStatusEl.innerText = data.message;
+                loadAllUsers(); 
+            } else { banStatusEl.className = 'error'; banStatusEl.innerText = `Lỗi: ${data.error}`; }
+        }
+        async function broadcastMessage() {
+            const message = broadcastMsgEl.value;
+            if (!message) { broadcastStatusEl.className = 'error'; broadcastStatusEl.innerText = "Vui lòng nhập nội dung."; return; }
+            if (!confirm("Bạn có chắc muốn gửi thông báo này đến TẤT CẢ user?")) return;
+            broadcastStatusEl.className = 'info'; broadcastStatusEl.innerText = "Đang gửi...";
+            const { ok, data } = await callApi('/admin/broadcast', 'POST', { admin_id: ADMIN_ID, message: message });
+            if (ok) {
+                broadcastStatusEl.className = 'success'; broadcastStatusEl.innerText = data.message;
+                broadcastMsgEl.value = "";
+            } else { broadcastStatusEl.className = 'error'; broadcastStatusEl.innerText = `Lỗi: ${data.error}`; }
+        }
+        async function createGiftcode() {
+            const code = codeNameEl.value.toUpperCase();
+            const amountStr = codeAmountEl.value;
+            const limitStr = codeLimitEl.value; 
+            if (!code || !amountStr || !limitStr) {
+                codeStatusEl.className = 'error'; 
+                codeStatusEl.innerText = "Vui lòng nhập Mã code, Số tiền, và Số lượt dùng."; 
+                return; 
+            }
+            let amount = parseInt(amountStr);
+            let limit = parseInt(limitStr); 
+            if (isNaN(amount) || amount <= 0 || isNaN(limit) || limit <= 0) {
+                codeStatusEl.className = 'error'; 
+                codeStatusEl.innerText = "Số tiền và Số lượt dùng phải là số lớn hơn 0."; 
+                return; 
+            }
+            codeStatusEl.className = 'info'; codeStatusEl.innerText = "Đang tạo...";
+            const { ok, data } = await callApi('/admin/create_giftcode', 'POST', { 
+                admin_id: ADMIN_ID, code: code, amount: amount, limit: limit 
+            });
+            if (ok) {
+                codeStatusEl.className = 'success'; codeStatusEl.innerText = data.message;
+                codeNameEl.value = ""; codeAmountEl.value = ""; codeLimitEl.value = "1";
+            } else { codeStatusEl.className = 'error'; codeStatusEl.innerText = `Lỗi: ${data.error}`; }
+        }
+        async function loadAllBetHistory() {
+            historyStatusEl.innerText = "";
+            historyListEl.innerHTML = "Đang tải...";
+            const { ok, data } = await callApi(`/admin/all_bet_history?admin_id=${ADMIN_ID}`);
+            if (ok) {
+                let listHtml = '<ul>';
+                if (data.length === 0) { listHtml = "Chưa có ai cược."; }
+                else {
+                    for (const log of data) {
+                        const icon = log.change > 0 ? '🟢' : '🔴';
+                        listHtml += `<li>
+                            ${icon} <strong>${log.username || log.user_id}</strong>
+                            (${log.choice} -> ${log.result})
+                            | Đổi: <strong>${log.change.toLocaleString('vi-VN')}đ</strong>
+                            <br><small style="color: #888;">${log.time}</small>
+                        </li>`;
+                    }
+                    listHtml += '</ul>';
+                }
+                historyListEl.innerHTML = listHtml;
+            } else { historyListEl.innerHTML = `<div class="error">Lỗi: ${data.error}</div>`; }
+        }
+
+        // === HÀM MỚI: CHỈNH KẾT QUẢ ===
+        let currentSessionId = 0;
+        async function getSessionId() {
+            setResultStatusEl.className = 'info';
+            setResultStatusEl.innerText = "Đang lấy phiên...";
+
+            // Gọi API /game/tx30/status để lấy phiên
+            const { ok, data } = await callApi('/game/tx30/status'); 
+
+            if (ok) {
+                if(data.status === 'pending') {
+                    currentSessionId = data.session_id;
+                    sessionIdInput.value = currentSessionId;
+                    setResultStatusEl.className = 'success';
+                    setResultStatusEl.innerText = `Đã lấy phiên #${currentSessionId}. (Còn ${data.time_left}s)`;
+                } else {
+                    currentSessionId = 0;
+                    sessionIdInput.value = "";
+                    setResultStatusEl.className = 'error';
+                    setResultStatusEl.innerText = "Đã hết thời gian cược. Chờ phiên mới.";
+                }
+            } else {
+                setResultStatusEl.className = 'error';
+                setResultStatusEl.innerText = `Lỗi: ${data.error}`;
+            }
+        }
+
+        async function setResult() {
+            const diceString = diceResultInput.value; // Lấy 3 số
+
+            if (currentSessionId === 0) {
+                setResultStatusEl.className = 'error';
+                setResultStatusEl.innerText = "Vui lòng 'LẤY PHIÊN' trước.";
+                return;
+            }
+            if (!diceString || diceString.length !== 3 || !/^[1-6]{3}$/.test(diceString)) {
+                setResultStatusEl.className = 'error';
+                setResultStatusEl.innerText = "Lỗi: Kết quả phải là 3 số (ví dụ: 123, 666).";
+                return;
+            }
+
+            setResultStatusEl.className = 'info';
+            setResultStatusEl.innerText = `Đang chỉnh kết quả thành ${diceString}...`;
+
+            const { ok, data } = await callApi('/admin/set_result', 'POST', {
+                admin_id: ADMIN_ID,
+                session_id: currentSessionId,
+                dice: diceString // Gửi 3 số
+            });
+
+            if (ok) {
+                setResultStatusEl.className = 'success';
+                setResultStatusEl.innerText = data.message;
+            } else {
+                setResultStatusEl.className = 'error';
+                setResultStatusEl.innerText = `Lỗi: ${data.error}`;
+            }
+            currentSessionId = 0;
+            sessionIdInput.value = "";
+            diceResultInput.value = "";
+        }
+
+    </script>
+</body>
+</html>
